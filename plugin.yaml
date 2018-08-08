@@ -3,7 +3,7 @@ plugins:
   healer: &utilities_plugin
     executor: central_deployment_agent
     package_name: cloudify-healer-plugin
-    source: cloudify-healer-plugin
+    source: https://github.com/dfilppi/cloudify-healer-plugin/archive/master.zip
     package_version: '.0.0.1'
 
 relationships:
