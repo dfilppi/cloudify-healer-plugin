@@ -1,0 +1,28 @@
+plugins:
+
+  healer: &utilities_plugin
+    executor: central_deployment_agent
+    package_name: cloudify-healer-plugin
+    source: cloudify-healer-plugin
+    package_version: '.0.0.1'
+
+relationships:
+
+  pinger_connected_to:
+    derived_from: cloudify.relationships.connected_to
+    source_interfaces:
+      cloudify.interfaces.relationship_lifecycle:
+        establish:
+          implementation: healer.cloudify_healer.launcher.launch
+          inputs:
+            creds:
+              description: credentials needed to call heal workflow
+              default: "admin,admin,default_tenant"
+            pingcnt:
+              description: number pings before failure
+              default: 3
+            pingfreq:
+              description: number of seconds between pings
+              default: 5
+        unlink:
+          implementation: healer.cloudify_healer.ping_stopper.stop
