@@ -15,6 +15,9 @@ def launch(creds, pingcnt, pingfreq, **kwargs):
   
   # Start ping process, put PID in attributes
   res = None
+  pid = os.fork()
+  if pid > 0:
+    return
   try:
     res = subprocess.Popen(["python", curdir+"/ping_healer.py", user, password, tenant, targetip, depid, targetid, str(pingfreq), str(pingcnt)])
     time.sleep(3)
