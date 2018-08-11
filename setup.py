@@ -16,7 +16,7 @@ import setuptools
 
 setuptools.setup(
     name='cloudify-healer-plugin',
-    version='0.0.1',
+    version='0.1',
     author='dfilppi',
     author_email='hello@getcloudify.org',
     description='Agentless healer plugin',

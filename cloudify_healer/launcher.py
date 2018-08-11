@@ -1,8 +1,6 @@
 import os
 import time
 from cloudify import ctx
-from cloudify.exceptions import NonRecoverableError
-import subprocess
 
 def launch(creds, pingcnt, pingfreq, **kwargs):
   #run as new process
@@ -17,12 +15,15 @@ def launch(creds, pingcnt, pingfreq, **kwargs):
   res = None
   pid = os.fork()
   if pid > 0:
-    return
-  try:
-    res = subprocess.Popen(["python", curdir+"/ping_healer.py", user, password, tenant, targetip, depid, targetid, str(pingfreq), str(pingcnt)])
-    time.sleep(3)
     ctx.source.instance.runtime_properties["pid"]= str(res.pid)
-    ctx.logger.info("exiting")
-  except Exception as e:
-    raise NonRecoverableError("CAUGHT EXCEPTION: {}".format(e.message))
-    
+    return
+
+  os.chdir("/")
+  os.umask(0)
+  os.setsid()
+
+  pid = os.fork()
+  if pid > 0:
+    os._exit(0)
+  
+  os.execlp("python", "python", curdir+"/ping_healer.py", user, password, tenant, targetip, depid, targetid, str(pingfreq), str(pingcnt))
