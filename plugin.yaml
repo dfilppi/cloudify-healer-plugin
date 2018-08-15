@@ -6,23 +6,73 @@ plugins:
     source: https://github.com/dfilppi/cloudify-healer-plugin/archive/master.zip
     package_version: '0.1'
 
+
+node_types:
+
+  cloudify.nodes.Healer:
+    derived_from: cloudify.nodes.Root
+    properties:
+      cfy_creds:
+        description: |
+          Cloudify credentials needed to call heal workflow.  
+          Comma separated list of the form: username, password, tenant
+        type: string
+        default: "admin,admin,default_tenant"
+  
+      type:      
+        description: |
+          Enum: "ping", "port", "http", or "custom"
+        type: string
+
+      config:
+        description: |
+          Healer configuration, specific to a specific healer:
+
+          "ping" - Pings a compute node (assumes node has healer_connected_to
+          relationship with a compute node with 'ip' runtime property, and
+          ICMP traffic allowed between manager and node):
+          {
+             count: <number of failed pings before failure>
+             frequency: <number of seconds between pings>
+          }
+
+          "port" - Tests a TCP connection on specified port (assumes node
+          has healer_connected_to relationship with a compute node with
+          'ip' runtime property, and traffic allowed between manager and
+          port on that node):
+          {
+             port: <the port to access>
+             count: <number of port connection errors before failure>
+             frequency: <number of seconds between connections>
+          }
+
+          "http" - Performs an HTTP get on specific host and port (assumes
+          node has healer_connected_to relationship with a compute node with
+          'ip' runtime property, and traffic allowed between manager and 
+          port on that node):
+          {
+             url: the target URL
+             count: <number of HTTP GET non-2xx responses before failure>
+             frequency: <number of seconds between connections>
+          }
+
+          "custom" - Calls specified Python script periodically in a subprocess.
+          Exit value of 1 implies error.
+          {
+             count: <number of HTTP GET non-2xx responses before failure>
+             frequency: <number of seconds between connections>
+             script: <path to a Python script> has access to context proxy
+          }
+          
+        default: {}    
+          
 relationships:
 
-  pinger_connected_to:
+  cloudify.relationships.healer_connected_to:
     derived_from: cloudify.relationships.connected_to
     source_interfaces:
       cloudify.interfaces.relationship_lifecycle:
         establish:
           implementation: healer.cloudify_healer.launcher.launch
-          inputs:
-            creds:
-              description: credentials needed to call heal workflow
-              default: "admin,admin,default_tenant"
-            pingcnt:
-              description: number pings before failure
-              default: 3
-            pingfreq:
-              description: number of seconds between pings
-              default: 5
         unlink:
-          implementation: healer.cloudify_healer.ping_stopper.stop
+          implementation: healer.cloudify_healer.stopper.stop
