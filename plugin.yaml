@@ -46,12 +46,15 @@ node_types:
              frequency: <number of seconds between connections>
           }
 
-          "http" - Performs an HTTP get on specific host and port (assumes
+          "http" - Performs an HTTP(s) get on specific host and port (assumes
           node has healer_connected_to relationship with a compute node with
           'ip' runtime property, and traffic allowed between manager and 
-          port on that node):
+          port on that node).  Constructed URL will have form
+          http(s)://<ip>:<port>/<path>:
           {
-             url: the target URL
+             path: the target path 
+             port: the target path
+             secure: boolean, if true 'https' URL will be constructed
              count: <number of HTTP GET non-2xx responses before failure>
              frequency: <number of seconds between connections>
           }
