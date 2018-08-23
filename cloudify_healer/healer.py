@@ -8,18 +8,15 @@ import json
 import requests
 from cloudify_rest_client import CloudifyClient
 
+DONE_STATES=["failed","completed","cancelled","terminated"]
+
 def main():
 
-  with open("/tmp/log","a+") as f:
-    f.write("\n---Starting {}---\n".format(time.asctime()))
-  
-  DONE_STATES=["failed","completed","cancelled","terminated"]
+  log("\n---Starting {}---".format(time.asctime()))
   
   if len(sys.argv)< 8:
-    with open("/tmp/log","a+") as f:
-      f.write("invalid args:"+str(sys.argv))
+    log("invalid args:"+str(sys.argv))
     os._exit(1)
-  
   
   # Collect parms
   
@@ -29,12 +26,35 @@ def main():
   testtype = nodeconfig['type']
   freq = nodeconfig['config']['frequency']
   count = nodeconfig['config']['count']
+
+  # Wait for install workflow to complete, if it doesn't, exit
+  #    Find install
+  client = CloudifyClient("127.0.0.1",username=username,password=password,tenant=tenant)
+  
+  status = None
+  for i in range(120):
+    installid, status = get_last_install(client, deployment_id ) 
+    if not status:
+      log("Failure: no install found. Exiting")
+      os._exit(1)
+    elif status != "started":
+      log("breaking on status {}".format(status))
+      break
+    log("waiting for install {} to complete".format(installid))
+    time.sleep(5)
+  if status == "started":
+    log("Timed out waiting for install to complete. Exiting.")
+    os._exit(1)
+  elif status != "terminated":
+    log("Install execution stopped. Reason={}. Exiting..".format(status))
+    os_exit(1)
+
+  log("install complete. continuing...")
   
   failcnt = 0
   
   while True:
-    with open("/tmp/log","a+") as f:
-      f.write("{}: {}\n".format(nodeconfig['type'],target_ip))
+    log("{}: {}".format(nodeconfig['type'],target_ip))
   
     failed = False
   
@@ -50,8 +70,7 @@ def main():
     elif testtype == 'custom':
       os.execlp("python", "python", script, sys.argv[7])
     else:
-      with open("/tmp/log","a+") as f:
-        f.write("ERROR: unknown test type: {}\n".format(testtype))
+      log("ERROR: unknown test type: {}".format(testtype))
       os._exit(1)
       
     if failed:
@@ -60,26 +79,23 @@ def main():
       if failcnt >=  count:
         #HEAL
         failcnt = 0
-        client = CloudifyClient("127.0.0.1",username=username,password=password,tenant=tenant)
-        with open("/tmp/log","a+") as f:
-          f.write("STARTING HEAL of {}\n".format(instance_id))
+        log("STARTING HEAL of {}".format(instance_id))
         execution = None
         try:
           execution = client.executions.start( deployment_id, "heal", {"node_instance_id": instance_id})
         except Exception as e: 
-          with open("/tmp/log","a+") as f:
-            f.write("CAUGHT EXCEPTION {}\n".format(e))
+          log("CAUGHT EXCEPTION {}".format(e))
           
-        with open("/tmp/log","a+") as f:
-          f.write("STARTED HEAL of {}\n".format(instance_id))
+        log("STARTED HEAL of {}".format(instance_id))
         while True:
           status  = execution.status
+          log("polling execution status = {}".format(status))
           if status == "failed":
-            with open("/tmp/log","a+") as f:
-              f.write("execution failed")
-              os._exit(0)
+            log("execution failed")
+            os._exit(0)
           if status in DONE_STATES:
             os._exit(0);
+          time.sleep(4)
   
     time.sleep(freq)
   
@@ -112,18 +128,44 @@ def doHttp(target_ip, freq, nodeconfig):
   try:
     ret = requests.get( url, timeout=int(freq))
     if ret.status_code < 200 or ret.status_code > 299:
-      with open("/tmp/log","a+") as f:
-        f.write("unexpected response code from {}:{}\n".format(url,ret.status_code))
+      log("unexpected response code from {}:{}".format(url,ret.status_code))
       failed = True
   except requests.exceptions.ConnectTimeout:
-    with open("/tmp/log","a+") as f:
-      f.write("timeout GET {}:{}\n".format(url,freq))
+    log("timeout GET {}:{}".format(url,freq))
     failed = True
   except Exception as e:
-    with open("/tmp/log","a+") as f:
-      f.write("caught exception in GET {}:{}\n".format(url,e.message))
+    log("caught exception in GET {}:{}".format(url,e.message))
     failed = True
   return failed
+
+
+def get_last_install(client, deployment_id):
+  """ Gets the execution and status of the last install for the supplied deployment
+  """
+
+  executions = client.executions.list( deployment_id = "p" )
+
+  execution = None
+  for e in executions:
+    if e.workflow_id == "install":
+      execution = e
+
+  if not execution:
+    return None, None   #no install found
+
+  log("execution status={}".format(execution.status))
+
+  if execution.status in ["started", "pending"]:
+    return execution.id, "started"
+  else: 
+    return execution.id, execution.status
+
+
+### REPLACE THIS WITH SOMETHING SANE
+def log(msg):
+  with open("/tmp/log","a+") as f:
+    f.write(msg+"\n")
+
 
 if __name__ == "__main__":
   main()
