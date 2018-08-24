@@ -6,6 +6,7 @@ import os
 import time
 import json
 import requests
+import socket
 from cloudify_rest_client import CloudifyClient
 
 DONE_STATES=["failed","completed","cancelled","terminated"]
@@ -62,7 +63,7 @@ def main():
       failed = doPing(target_ip)
   
     elif testtype == 'port':
-      os._exit(1)
+      failed = doSocket(target_ip, freq, nodeconfig)
   
     elif testtype == 'http':
       failed = doHttp(target_ip, freq, nodeconfig)
@@ -135,6 +136,21 @@ def doHttp(target_ip, freq, nodeconfig):
     failed = True
   except Exception as e:
     log("caught exception in GET {}:{}".format(url,e.message))
+    failed = True
+  return failed
+
+
+def doSocket(target_ip, freq, nodeconfig):
+  """ Open a TCP socket constructed from the ip and port from 
+      properties
+  """
+  failed = False
+  try:
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(1)
+    s.connect((target_ip,nodeconfig['config']['port']))
+  except Exception as e:
+    log("exception: {}".format(str(e)))
     failed = True
   return failed
 
