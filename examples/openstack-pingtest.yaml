@@ -1,0 +1,102 @@
+tosca_definitions_version: cloudify_dsl_1_3
+
+imports:
+  - http://www.getcloudify.org/spec/cloudify/4.3.2/types.yaml
+  - plugin:cloudify-healer-plugin
+  - plugin:cloudify-openstack-plugin
+  - plugin:cloudify-utilities-plugin
+
+dsl_definitions:
+
+  client_config: &client_config
+    username: dewayne
+    password: TEMPviBKwW4E
+    tenant_name: dewayne-tenant
+    auth_url: https://rackspace-api.cloudify.co:5000/v3
+    region: RegionOne
+    
+node_templates:
+
+  httpd:
+    type: cloudify.nodes.CloudInit.CloudConfig
+    properties:
+      resource_config:
+        packages:
+          - apache2
+
+  compute:
+    type: cloudify.openstack.nodes.Server
+    properties:
+      openstack_config: *client_config
+      agent_config:
+        install_method: none
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              image: ad44a580-0482-4e30-bdf5-1de3cbb7401b
+              flavor: 3
+              userdata: { get_attribute: [ httpd, cloud_config ] }
+    relationships:
+      - type: cloudify.openstack.server_connected_to_port 
+        target: port
+      - type: cloudify.relationships.depends_on
+        target: httpd
+      - type: cloudify.relationships.connected_to
+        target: key
+      - type: cloudify.relationships.depends_on
+        target: httpd
+
+  key:
+    type: cloudify.openstack.nodes.KeyPair
+    properties:
+      openstack_config: *client_config
+      use_external_resource: true
+      resource_id: dfilppi-rs
+      private_key_path: /etc/cloudify/dfilppi-rs.pem
+
+  network:
+    type: cloudify.openstack.nodes.Network
+    properties:
+      openstack_config: *client_config
+      use_external_resource: true
+      resource_id: ad5670f2-7448-473b-9599-bdb958247ffe
+
+  subnet:
+    type: cloudify.openstack.nodes.Subnet
+    properties:
+      openstack_config: *client_config
+      use_external_resource: true
+      resource_id: b76485d2-171f-45f1-943e-23ac95f29a2d
+
+  port:
+    type: cloudify.openstack.nodes.Port
+    properties:
+      openstack_config: *client_config
+    relationships:
+      - target: network
+        type: cloudify.relationships.connected_to
+      - type: cloudify.openstack.port_connected_to_security_group
+        target: secgroup
+      - type: cloudify.openstack.port_connected_to_subnet 
+        target: subnet
+
+  secgroup:
+    type: cloudify.openstack.nodes.SecurityGroup
+    properties:
+      openstack_config: *client_config
+      use_external_resource: true
+      resource_id: open
+      
+  healer:
+    type: cloudify.nodes.Healer
+    properties:
+      cfy_creds: {get_secret: cfy_creds}
+      type: ping
+      config:
+        count: 3
+        frequency: 5
+    relationships:
+      - target: compute
+        type: cloudify.relationships.healer_connected_to
