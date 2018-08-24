@@ -53,7 +53,7 @@ node_types:
           http(s)://<ip>:<port>/<path>:
           {
              path: the target path 
-             port: the target path
+             port: the target port
              secure: boolean, if true 'https' URL will be constructed
              count: <number of HTTP GET non-2xx responses before failure>
              frequency: <number of seconds between connections>
