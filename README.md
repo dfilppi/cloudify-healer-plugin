@@ -35,3 +35,6 @@ The port healer tries to open a connection to the supplied port on the target ho
 
 #### Relationship: cloudify.relationships.healer_connected_to
 This relationship source should be the cloudify.nodes.Healer node template, and the target should be a compute node.  The ip address of the compute node is used to supply the target IP address to the various healers.  It has no inputs.
+
+### Examples
+There are three example blueprints, one that demonstrates pinging a host with debug on, one that demonstrates performing an HTTPGET on an Apache web server, and one that attempts to connect to a socket.  To see healing work, simply kill the target server and wait.  You can tail the `/tmp/heal_<deployment_id>_<pid>` file to see the failure detection.  Note that once a heal happens, a new log file is opened with the new healer pid. If you turn debug on, the actual individual test repetitions are logged.
