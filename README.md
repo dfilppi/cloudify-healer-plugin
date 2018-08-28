@@ -8,7 +8,7 @@ The plugin defines a new node type and relationship type.  The node type holds t
 
 #### cloudify.nodes.Healer
 
-The `Healer` type configures the healer based on 4 different modes.  The modes are selected by setting the `type` property to one o:
+The `Healer` type configures the healer based on 4 different modes.  The modes are selected by setting the `type` property to one of:
 * _ping_ - Performs ICMP pings on a host
 * _http_ - Performs an HTTP get on a URL
 * _port_ - Performs an connection open on a TCP port
