@@ -24,6 +24,12 @@ node_types:
           Enum: "ping", "port", "http", or "custom"
         type: string
 
+      debug:
+        description: |
+          Boolean.  If true, debug logging will be turned on in healer log files
+        type: boolean
+        default: false
+
       config:
         description: |
           Healer configuration, specific to a specific healer:

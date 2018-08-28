@@ -7,18 +7,15 @@ import time
 import json
 import requests
 import socket
+import logging
 from cloudify_rest_client import CloudifyClient
 
 DONE_STATES=["failed","completed","cancelled","terminated"]
+logger = None
 
 def main():
+  global logger
 
-  log("\n---Starting {}---".format(time.asctime()))
-  
-  if len(sys.argv)< 8:
-    log("invalid args:"+str(sys.argv))
-    os._exit(1)
-  
   # Collect parms
   
   username,password,tenant,target_ip,deployment_id,instance_id = sys.argv[1:7]
@@ -27,6 +24,15 @@ def main():
   testtype = nodeconfig['type']
   freq = nodeconfig['config']['frequency']
   count = nodeconfig['config']['count']
+  debug = bool(nodeconfig['debug'])
+  loglevel = logging.DEBUG if debug else logging.INFO
+
+  # Open logger
+  logfile = "/tmp/healer_" + deployment_id + "_" + str(os.getpid()) +".log"
+  logging.basicConfig(filename = logfile, format='%(asctime)s %(levelname)8s %(message)s',level=loglevel)
+  logger = logging.getLogger("healer")
+
+  logger.info("\n---Starting {}---".format(time.asctime()))
 
   # Wait for install workflow to complete, if it doesn't, exit
   #    Find install
@@ -36,26 +42,26 @@ def main():
   for i in range(120):
     installid, status = get_last_install(client, deployment_id ) 
     if not status:
-      log("Failure: no install found. Exiting")
+      logger.error("Failure: no install found. Exiting")
       os._exit(1)
     elif status != "started":
-      log("breaking on status {}".format(status))
+      logger.debug("breaking on status {}".format(status))
       break
-    log("waiting for install {} to complete".format(installid))
+    logger.info("waiting for install {} to complete".format(installid))
     time.sleep(5)
   if status == "started":
-    log("Timed out waiting for install to complete. Exiting.")
+    logger.error("Timed out waiting for install to complete. Exiting.")
     os._exit(1)
   elif status != "terminated":
-    log("Install execution stopped. Reason={}. Exiting..".format(status))
+    logger.error("Install execution stopped. Reason={}. Exiting..".format(status))
     os_exit(1)
 
-  log("install complete. continuing...")
+  logger.info("install complete. continuing...")
   
   failcnt = 0
   
   while True:
-    log("{}: {}".format(nodeconfig['type'],target_ip))
+    logger.debug("{}: {}".format(nodeconfig['type'],target_ip))
   
     failed = False
   
@@ -71,28 +77,29 @@ def main():
     elif testtype == 'custom':
       os.execlp("python", "python", script, sys.argv[7])
     else:
-      log("ERROR: unknown test type: {}".format(testtype))
+      logger.error("ERROR: unknown test type: {}".format(testtype))
       os._exit(1)
       
     if failed:
       failed = False
       failcnt+=1
+      logger.error("Target test failure. Fail count = {}".format(failcnt))
       if failcnt >=  count:
         #HEAL
         failcnt = 0
-        log("STARTING HEAL of {}".format(instance_id))
+        logger.info("STARTING HEAL of {}".format(instance_id))
         execution = None
         try:
           execution = client.executions.start( deployment_id, "heal", {"node_instance_id": instance_id})
         except Exception as e: 
-          log("CAUGHT EXCEPTION {}".format(e))
+          logger.error("CAUGHT EXCEPTION {}".format(e))
           
-        log("STARTED HEAL of {}".format(instance_id))
+        logger.info("STARTED HEAL of {}".format(instance_id))
         while True:
           status  = execution.status
-          log("polling execution status = {}".format(status))
+          logger.debug("polling execution status = {}".format(status))
           if status == "failed":
-            log("execution failed")
+            logger.error("execution failed")
             os._exit(0)
           if status in DONE_STATES:
             os._exit(0);
@@ -129,13 +136,13 @@ def doHttp(target_ip, freq, nodeconfig):
   try:
     ret = requests.get( url, timeout=int(freq))
     if ret.status_code < 200 or ret.status_code > 299:
-      log("unexpected response code from {}:{}".format(url,ret.status_code))
+      logger.error("unexpected response code from {}:{}".format(url,ret.status_code))
       failed = True
   except requests.exceptions.ConnectTimeout:
-    log("timeout GET {}:{}".format(url,freq))
+    logger.error("timeout GET {}:{}".format(url,freq))
     failed = True
   except Exception as e:
-    log("caught exception in GET {}:{}".format(url,e.message))
+    logger.error("caught exception in GET {}:{}".format(url,e.message))
     failed = True
   return failed
 
@@ -150,7 +157,7 @@ def doSocket(target_ip, freq, nodeconfig):
     s.settimeout(1)
     s.connect((target_ip,nodeconfig['config']['port']))
   except Exception as e:
-    log("exception: {}".format(str(e)))
+    logger.error("exception: {}".format(str(e)))
     failed = True
   return failed
 
@@ -169,18 +176,10 @@ def get_last_install(client, deployment_id):
   if not execution:
     return None, None   #no install found
 
-  log("execution status={}".format(execution.status))
-
   if execution.status in ["started", "pending"]:
     return execution.id, "started"
   else: 
     return execution.id, execution.status
-
-
-### REPLACE THIS WITH SOMETHING SANE
-def log(msg):
-  with open("/tmp/log","a+") as f:
-    f.write(msg+"\n")
 
 
 if __name__ == "__main__":

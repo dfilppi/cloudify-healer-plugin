@@ -94,6 +94,7 @@ node_templates:
     properties:
       cfy_creds: {get_secret: cfy_creds}
       type: ping
+      debug: true
       config:
         count: 3
         frequency: 5
