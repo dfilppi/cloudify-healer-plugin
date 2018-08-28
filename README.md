@@ -16,6 +16,7 @@ The `Healer` type configures the healer based on 4 different modes.  The modes a
 
 ##### Common Properties
 * _cfy_creds_ - Cloudify manager login credentials of the form `username,password,tenant_name`.  This is needed by the healer to run the _heal_ workflow on the target node.  These are best stored using the secret store.
+* _debug_ - The plugin starts a background process that logs to '/tmp/healer_<deployment_id>_pid.log'.  This logging occurs at `info` level unless the `debug` property is true.
 * _config/count_ The number of failed attempts that will trigger a heal.
 * _config/frequency_ The pause between retries in seconds
 
