@@ -197,7 +197,7 @@ def get_last_install(client, deployment_id):
         for the supplied deployment
     """
 
-    executions = client.executions.list(deployment_id="p")
+    executions = client.executions.list(deployment_id=deployment_id)
 
     execution = None
     for e in executions:
